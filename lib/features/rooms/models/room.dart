@@ -3,8 +3,8 @@ class Room {
   final String roomNumber;
   final double pricePerNight;
   final bool isAvailable;
-  final String? description;
-  final String? imageUrl;
+  final String? description; // Cho phép null
+  final String? imageUrl; // Cho phép null
   final DateTime createdAt;
 
   Room({
@@ -19,14 +19,14 @@ class Room {
 
   factory Room.fromJson(Map<String, dynamic> json) {
     return Room(
-      id: json['id'] ?? 0,
-      roomNumber: json['roomNumber'] ?? '',
-      pricePerNight: (json['pricePerNight'] ?? 0.0).toDouble(),
-      isAvailable: json['isAvailable'] ?? true,
-      description: json['description'],
-      imageUrl: json['imageUrl'],
+      id: json['id'] as int? ?? 0,
+      roomNumber: json['roomNumber'] as String? ?? '',
+      pricePerNight: (json['pricePerNight'] as num?)?.toDouble() ?? 0.0,
+      isAvailable: json['isAvailable'] as bool? ?? false,
+      description: json['description'] as String?,
+      imageUrl: json['imageUrl'] as String?,
       createdAt: DateTime.parse(
-        json['createdAt'] ?? DateTime.now().toIso8601String(),
+        json['createdAt'] as String? ?? DateTime.now().toIso8601String(),
       ),
     );
   }

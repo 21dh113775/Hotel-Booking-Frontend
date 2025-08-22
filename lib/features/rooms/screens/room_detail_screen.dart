@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../models/room.dart';
 
 class RoomDetailScreen extends StatelessWidget {
@@ -7,6 +9,7 @@ class RoomDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Room room = ModalRoute.of(context)!.settings.arguments as Room;
+    final authProvider = Provider.of<AuthProvider>(context);
 
     return Scaffold(
       appBar: AppBar(title: Text('Phòng ${room.roomNumber}')),
@@ -15,7 +18,7 @@ class RoomDetailScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (room.imageUrl != null)
+            if (room.imageUrl != null && room.imageUrl!.isNotEmpty)
               Center(
                 child: Image.network(
                   'https://localhost:7284${room.imageUrl}',
@@ -33,7 +36,7 @@ class RoomDetailScreen extends StatelessWidget {
             ),
             Text('Giá: ${room.pricePerNight.toStringAsFixed(0)} VNĐ/đêm'),
             Text('Trạng thái: ${room.isAvailable ? "Còn trống" : "Đã đặt"}'),
-            if (room.description != null) ...[
+            if (room.description != null && room.description!.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text('Mô tả: ${room.description}'),
             ],
@@ -42,12 +45,23 @@ class RoomDetailScreen extends StatelessWidget {
               onPressed:
                   room.isAvailable
                       ? () {
-                        // TODO: Chuyển sang màn hình đặt phòng (Bước 2.3)
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Chuyển sang đặt phòng'),
-                          ),
-                        );
+                        if (authProvider.isLoggedIn) {
+                          Navigator.pushNamed(
+                            context,
+                            '/booking-form',
+                            arguments: room,
+                          );
+                        } else {
+                          // Lưu room để quay lại sau khi đăng nhập
+                          Navigator.pushNamed(
+                            context,
+                            '/login',
+                            arguments: {
+                              'redirectRoute': '/booking-form',
+                              'redirectArguments': room,
+                            },
+                          );
+                        }
                       }
                       : null,
               child: const Text('Đặt Phòng'),

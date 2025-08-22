@@ -24,6 +24,15 @@ class _RoomListScreenState extends State<RoomListScreen> {
   Widget build(BuildContext context) {
     final roomProvider = Provider.of<RoomProvider>(context);
 
+    if (roomProvider.errorMessage != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Fluttertoast.showToast(
+          msg: roomProvider.errorMessage!,
+          backgroundColor: Colors.red,
+        );
+      });
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('Danh Sách Phòng')),
       body:

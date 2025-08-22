@@ -12,7 +12,7 @@ class RoomCard extends StatelessWidget {
       elevation: 4,
       child: ListTile(
         leading:
-            room.imageUrl != null
+            room.imageUrl != null && room.imageUrl!.isNotEmpty
                 ? Image.network(
                   'https://localhost:7284${room.imageUrl}',
                   width: 50,
@@ -28,7 +28,8 @@ class RoomCard extends StatelessWidget {
           children: [
             Text('Giá: ${room.pricePerNight.toStringAsFixed(0)} VNĐ/đêm'),
             Text(room.isAvailable ? 'Còn trống' : 'Đã đặt'),
-            if (room.description != null) Text(room.description!),
+            if (room.description != null && room.description!.isNotEmpty)
+              Text(room.description!),
           ],
         ),
         onTap: () {
