@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:hotel_booking_frontend/features/admin/dto/staff/staff_shift_create_dto.dart';
+import 'package:hotel_booking_frontend/features/admin/dto/staff/staff_shift_update_dto.dart';
+import 'package:hotel_booking_frontend/features/admin/models/staff_shift.dart';
 import 'package:provider/provider.dart';
 import '../providers/admin_provider.dart';
-import '../dto/staff_shift_create_dto.dart';
+import 'dart:io';
 
 class ShiftManagementScreen extends StatefulWidget {
   const ShiftManagementScreen({super.key});
@@ -11,27 +14,26 @@ class ShiftManagementScreen extends StatefulWidget {
 }
 
 class _ShiftManagementScreenState extends State<ShiftManagementScreen> {
-  int _selectedStaffId = 1; // Default, sẽ load từ list staff
+  DateTime _selectedDate = DateTime.now();
+  int? _selectedStaffId;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<AdminProvider>(
-        context,
-        listen: false,
-      ).fetchShifts(_selectedStaffId); // Fetch cho staff đầu tiên
+      Provider.of<AdminProvider>(context, listen: false).fetchStaffs();
+      if (_selectedStaffId != null) {
+        Provider.of<AdminProvider>(
+          context,
+          listen: false,
+        ).fetchShiftsByDate(_selectedDate, _selectedStaffId);
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final adminProvider = Provider.of<AdminProvider>(context);
-
-    final staffList =
-        adminProvider.users
-            .where((user) => user.role == 'Staff')
-            .toList(); // Lấy thông tin staff từ users
 
     return Scaffold(
       appBar: AppBar(title: const Text('Quản Lý Ca Làm')),
@@ -44,69 +46,196 @@ class _ShiftManagementScreenState extends State<ShiftManagementScreen> {
                 children: [
                   Padding(
                     padding: const EdgeInsets.all(8.0),
-                    child: DropdownButton<int>(
-                      value: _selectedStaffId,
-                      items:
-                          staffList
-                              .map(
-                                (staff) => DropdownMenuItem(
-                                  value: staff.id,
-                                  child: Text(staff.fullName),
-                                ),
-                              )
-                              .toList(),
-                      onChanged: (value) {
-                        setState(() => _selectedStaffId = value!);
-                        adminProvider.fetchShifts(_selectedStaffId);
-                      },
+                    child: Row(
+                      children: [
+                        Text(
+                          'Ngày: ${_selectedDate.toLocal().toString().split(' ')[0]}',
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.calendar_today),
+                          onPressed: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: _selectedDate,
+                              firstDate: DateTime.now().subtract(
+                                const Duration(days: 30),
+                              ),
+                              lastDate: DateTime.now().add(
+                                const Duration(days: 365),
+                              ),
+                            );
+                            if (picked != null) {
+                              setState(() {
+                                _selectedDate = picked;
+                              });
+                              if (_selectedStaffId != null) {
+                                adminProvider.fetchShiftsByDate(
+                                  _selectedDate,
+                                  _selectedStaffId,
+                                );
+                              }
+                            }
+                          },
+                        ),
+                        const SizedBox(width: 16),
+                        DropdownButton<int>(
+                          hint: const Text('Chọn Nhân Viên'),
+                          value: _selectedStaffId,
+                          items:
+                              adminProvider.staffs
+                                  .map(
+                                    (staff) => DropdownMenuItem(
+                                      value: staff.id,
+                                      child: Text(staff.name),
+                                    ),
+                                  )
+                                  .toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedStaffId = value;
+                            });
+                            if (value != null) {
+                              adminProvider.fetchShiftsByDate(
+                                _selectedDate,
+                                value,
+                              );
+                            }
+                          },
+                        ),
+                      ],
                     ),
                   ),
                   Expanded(
                     child: ListView.builder(
-                      itemCount: adminProvider.shifts.length,
+                      itemCount:
+                          _selectedStaffId != null
+                              ? 1
+                              : adminProvider.staffs.length,
                       itemBuilder: (context, index) {
-                        final shift = adminProvider.shifts[index];
-                        return ListTile(
-                          title: Text('Ca ${shift.shiftTime}'),
-                          subtitle: Text('Ngày: ${shift.shiftDate.toLocal()}'),
-                          onLongPress: () {
-                            showDialog(
-                              context: context,
-                              builder:
-                                  (context) => AlertDialog(
-                                    title: const Text('Xác nhận xóa'),
-                                    content: const Text(
-                                      'Bạn có chắc muốn xóa ca này?',
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context),
-                                        child: const Text('Hủy'),
+                        final staff =
+                            _selectedStaffId != null
+                                ? adminProvider.staffs.firstWhere(
+                                  (s) => s.id == _selectedStaffId,
+                                )
+                                : adminProvider.staffs[index];
+                        final staffShifts =
+                            adminProvider.shifts
+                                .where(
+                                  (shift) =>
+                                      shift.staffId == staff.id &&
+                                      shift.shiftDate.day ==
+                                          _selectedDate.day &&
+                                      shift.shiftDate.month ==
+                                          _selectedDate.month &&
+                                      shift.shiftDate.year ==
+                                          _selectedDate.year,
+                                )
+                                .toList();
+                        return Card(
+                          margin: const EdgeInsets.symmetric(
+                            vertical: 4,
+                            horizontal: 8,
+                          ),
+                          child: ExpansionTile(
+                            title: Text('${staff.name} (ID: ${staff.id})'),
+                            children: [
+                              ...['Morning', 'Afternoon', 'Night'].map((
+                                shiftTime,
+                              ) {
+                                final shift = staffShifts.firstWhere(
+                                  (s) => s.shiftTime == shiftTime,
+                                  orElse:
+                                      () => StaffShift(
+                                        id: -1,
+                                        staffId: staff.id,
+                                        shiftDate: _selectedDate,
+                                        shiftTime: shiftTime,
+                                        status: '',
                                       ),
-                                      TextButton(
+                                );
+                                return ListTile(
+                                  title: Text('Ca $shiftTime'),
+                                  subtitle:
+                                      shift.id != -1
+                                          ? Text('Đã xếp lịch')
+                                          : Text('Chưa xếp lịch'),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (shift.id != -1)
+                                        IconButton(
+                                          icon: const Icon(Icons.edit),
+                                          onPressed:
+                                              () => _showEditShiftDialog(
+                                                context,
+                                                adminProvider,
+                                                shift,
+                                              ),
+                                        ),
+                                      IconButton(
+                                        icon: Icon(
+                                          shift.id != -1
+                                              ? Icons.delete
+                                              : Icons.add,
+                                        ),
                                         onPressed: () {
-                                          adminProvider.deleteShift(
-                                            shift.id,
-                                            _selectedStaffId,
-                                          );
-                                          Navigator.pop(context);
+                                          if (shift.id != -1) {
+                                            showDialog(
+                                              context: context,
+                                              builder:
+                                                  (context) => AlertDialog(
+                                                    title: const Text(
+                                                      'Xác nhận xóa',
+                                                    ),
+                                                    content: const Text(
+                                                      'Bạn có chắc muốn xóa ca này?',
+                                                    ),
+                                                    actions: [
+                                                      TextButton(
+                                                        onPressed:
+                                                            () => Navigator.pop(
+                                                              context,
+                                                            ),
+                                                        child: const Text(
+                                                          'Hủy',
+                                                        ),
+                                                      ),
+                                                      TextButton(
+                                                        onPressed: () {
+                                                          adminProvider
+                                                              .deleteShift(
+                                                                shift.id,
+                                                                staff.id,
+                                                              );
+                                                          Navigator.pop(
+                                                            context,
+                                                          );
+                                                        },
+                                                        child: const Text(
+                                                          'Xóa',
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                            );
+                                          } else {
+                                            _showAddShiftDialog(
+                                              context,
+                                              adminProvider,
+                                              staff.id,
+                                              shiftTime,
+                                            );
+                                          }
                                         },
-                                        child: const Text('Xóa'),
                                       ),
                                     ],
                                   ),
-                            );
-                          },
+                                );
+                              }).toList(),
+                            ],
+                          ),
                         );
                       },
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: ElevatedButton(
-                      onPressed:
-                          () => _showAddShiftDialog(context, adminProvider),
-                      child: const Text('Thêm Ca Làm'),
                     ),
                   ),
                 ],
@@ -114,36 +243,19 @@ class _ShiftManagementScreenState extends State<ShiftManagementScreen> {
     );
   }
 
-  void _showAddShiftDialog(BuildContext context, AdminProvider provider) {
-    final _dateController = TextEditingController();
-    String? _shiftTime;
-
+  void _showAddShiftDialog(
+    BuildContext context,
+    AdminProvider provider,
+    int staffId,
+    String shiftTime,
+  ) {
     showDialog(
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Thêm Ca Làm Mới'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: _dateController,
-                  decoration: const InputDecoration(
-                    labelText: 'Ngày (yyyy-MM-dd)',
-                  ),
-                ),
-                DropdownButton<String>(
-                  hint: const Text('Chọn Ca'),
-                  value: _shiftTime,
-                  items:
-                      const ['Morning', 'Afternoon', 'Night']
-                          .map(
-                            (e) => DropdownMenuItem(value: e, child: Text(e)),
-                          )
-                          .toList(),
-                  onChanged: (value) => setState(() => _shiftTime = value),
-                ),
-              ],
+            title: const Text('Thêm Ca Làm'),
+            content: Text(
+              'Thêm ca $shiftTime cho nhân viên $staffId vào ngày ${_selectedDate.toLocal().toString().split(' ')[0]}?',
             ),
             actions: [
               TextButton(
@@ -152,17 +264,60 @@ class _ShiftManagementScreenState extends State<ShiftManagementScreen> {
               ),
               TextButton(
                 onPressed: () {
-                  if (_dateController.text.isNotEmpty && _shiftTime != null) {
-                    final dto = StaffShiftCreateDto(
-                      staffId: _selectedStaffId,
-                      shiftDate: DateTime.parse(_dateController.text),
-                      shiftTime: _shiftTime!,
-                    );
-                    provider.assignShift(dto);
-                  }
+                  final dto = StaffShiftCreateDto(
+                    staffId: staffId,
+                    shiftDate: _selectedDate,
+                    shiftTime: shiftTime,
+                  );
+                  provider.assignShift(dto);
                   Navigator.pop(context);
                 },
                 child: const Text('Thêm'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  void _showEditShiftDialog(
+    BuildContext context,
+    AdminProvider provider,
+    StaffShift shift,
+  ) {
+    String? _shiftTime = shift.shiftTime;
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Chỉnh Sửa Ca Làm'),
+            content: DropdownButton<String>(
+              value: _shiftTime,
+              items:
+                  ['Morning', 'Afternoon', 'Night']
+                      .map(
+                        (time) =>
+                            DropdownMenuItem(value: time, child: Text(time)),
+                      )
+                      .toList(),
+              onChanged: (value) => setState(() => _shiftTime = value),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Hủy'),
+              ),
+              TextButton(
+                onPressed: () {
+                  final dto = StaffShiftUpdateDto(
+                    staffId: shift.staffId,
+                    shiftDate: shift.shiftDate,
+                    shiftTime: _shiftTime!,
+                    id: shift.id,
+                  );
+                  provider.updateShift(shift.id, dto);
+                  Navigator.pop(context);
+                },
+                child: const Text('Lưu'),
               ),
             ],
           ),

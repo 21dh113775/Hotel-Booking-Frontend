@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:hotel_booking_frontend/features/admin/dto/booking/booking_update_dto.dart';
+import 'package:hotel_booking_frontend/features/admin/dto/room/room_create_dto.dart';
+import 'package:hotel_booking_frontend/features/admin/dto/room/room_update_dto.dart';
+import 'package:hotel_booking_frontend/features/admin/dto/staff/staff_shift_create_dto.dart';
+import 'package:hotel_booking_frontend/features/admin/dto/staff/staff_shift_update_dto.dart';
+import 'package:hotel_booking_frontend/features/admin/dto/voucher/voucher_create_dto.dart';
 import '../models/staff_shift.dart';
+import '../models/staff.dart';
 import '../services/admin_service.dart';
 import '../../auth/models/user.dart';
 import '../../rooms/models/room.dart';
 import '../../vouchers/models/voucher.dart';
 import '../../bookings/models/booking.dart';
 import '../dto/admin_user_update_dto.dart';
-import '../dto/room_create_dto.dart';
-import '../dto/voucher_create_dto.dart';
-import '../dto/staff_shift_create_dto.dart';
-import '../dto/booking_update_dto.dart'; // Import DTO mới
 
 class AdminProvider with ChangeNotifier {
   List<User> _users = [];
@@ -27,6 +30,8 @@ class AdminProvider with ChangeNotifier {
   List<Booking> get bookings => _bookings;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  List<Staff> _staffs = [];
+  List<Staff> get staffs => _staffs;
 
   final AdminService _adminService = AdminService();
 
@@ -103,6 +108,21 @@ class AdminProvider with ChangeNotifier {
     }
   }
 
+  Future<void> updateRoom(int id, RoomUpdateDto dto) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      await _adminService.updateRoom(id, dto);
+      await fetchRooms();
+    } catch (e) {
+      _errorMessage = 'Lỗi cập nhật phòng: $e';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> fetchVouchers() async {
     _isLoading = true;
     _errorMessage = null;
@@ -141,6 +161,21 @@ class AdminProvider with ChangeNotifier {
       await fetchVouchers();
     } catch (e) {
       _errorMessage = 'Lỗi xóa voucher: $e';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> createVoucher(VoucherCreateDto dto) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      await _adminService.createVoucher(dto);
+      await fetchVouchers();
+    } catch (e) {
+      _errorMessage = 'Lỗi tạo voucher: $e';
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -191,6 +226,21 @@ class AdminProvider with ChangeNotifier {
     }
   }
 
+  Future<void> updateShift(int id, StaffShiftUpdateDto dto) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      await _adminService.updateShift(id, dto);
+      await fetchShifts(dto.staffId); // Giả định dto có staffId
+    } catch (e) {
+      _errorMessage = 'Lỗi cập nhật ca làm: $e';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> fetchBookings() async {
     _isLoading = true;
     _errorMessage = null;
@@ -205,23 +255,6 @@ class AdminProvider with ChangeNotifier {
     }
   }
 
-  // Thêm phương thức createVoucher
-  Future<void> createVoucher(VoucherCreateDto dto) async {
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
-    try {
-      await _adminService.createVoucher(dto);
-      await fetchVouchers();
-    } catch (e) {
-      _errorMessage = 'Lỗi tạo voucher: $e';
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  // Thêm phương thức deleteBooking
   Future<void> deleteBooking(int id) async {
     _isLoading = true;
     _errorMessage = null;
@@ -237,7 +270,6 @@ class AdminProvider with ChangeNotifier {
     }
   }
 
-  // Thêm phương thức updateBooking
   Future<void> updateBooking(BookingUpdateDto dto) async {
     _isLoading = true;
     _errorMessage = null;
@@ -247,6 +279,34 @@ class AdminProvider with ChangeNotifier {
       await fetchBookings();
     } catch (e) {
       _errorMessage = 'Lỗi cập nhật booking: $e';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> fetchShiftsByDate(DateTime date, [int? staffId]) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      _shifts = await _adminService.getShiftsByDate(date, staffId);
+    } catch (e) {
+      _errorMessage = 'Lỗi tải ca làm việc theo ngày: $e';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> fetchStaffs() async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      _staffs = await _adminService.getStaffs();
+    } catch (e) {
+      _errorMessage = 'Lỗi tải danh sách nhân viên: $e';
     } finally {
       _isLoading = false;
       notifyListeners();

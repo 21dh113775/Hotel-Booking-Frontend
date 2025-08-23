@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:hotel_booking_frontend/features/admin/dto/register_dto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
@@ -36,13 +37,22 @@ class AuthProvider with ChangeNotifier {
 
     if (_token != null && _token!.isNotEmpty) {
       try {
-        // Validate token format trước khi gọi API
         if (!_isValidJwtFormat(_token!)) {
           print('Invalid JWT format, clearing token');
           await logout();
           _isLoading = false;
           notifyListeners();
           return;
+        }
+
+        final payload = _decodeJwtPayload(_token!);
+        print('JWT payload: $payload');
+        if (payload?['role'] != 'Admin') {
+          print('Role is not Admin, clearing token');
+          await logout();
+          _isLoading = false;
+          notifyListeners();
+          throw Exception('Role not authorized as Admin');
         }
 
         _user = await _authService.getProfile();
@@ -62,14 +72,12 @@ class AuthProvider with ChangeNotifier {
     return parts.length == 3;
   }
 
-  // Debug method để decode JWT payload
   Map<String, dynamic>? _decodeJwtPayload(String token) {
     try {
       final parts = token.split('.');
       if (parts.length != 3) return null;
 
       final payload = parts[1];
-      // Thêm padding nếu cần
       var normalized = base64Url.normalize(payload);
       final decoded = utf8.decode(base64Url.decode(normalized));
       return jsonDecode(decoded);
@@ -79,11 +87,25 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  Future<void> register(Map<String, dynamic> data) async {
+  Future<void> register({
+    required String fullName,
+    required String email,
+    required String phoneNumber,
+    required String password,
+    required int roleId, // Tham số roleId
+  }) async {
     _isLoading = true;
     notifyListeners();
     try {
-      final response = await _authService.register(data);
+      final dto = RegisterDto(
+        fullName: fullName,
+        email: email,
+        phoneNumber: phoneNumber,
+        password: password,
+        roleId: roleId, // Gửi RoleId = 1 cho Admin
+      );
+      print('Register request body: ${jsonEncode(dto.toJson())}'); // Debug body
+      final response = await _authService.register(dto.toJson());
       print('Register response: ${response.statusCode} ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -94,7 +116,6 @@ class AuthProvider with ChangeNotifier {
           throw Exception('Token not found in response');
         }
 
-        // Debug JWT payload
         final payload = _decodeJwtPayload(_token!);
         print('JWT payload: $payload');
 
@@ -102,7 +123,6 @@ class AuthProvider with ChangeNotifier {
         await prefs.setString('jwt_token', _token!);
         print('New token saved: $_token');
 
-        // Đợi một chút trước khi load profile
         await Future.delayed(const Duration(milliseconds: 100));
 
         _user = await _authService.getProfile();
@@ -131,7 +151,6 @@ class AuthProvider with ChangeNotifier {
     _isLoading = true;
     notifyListeners();
     try {
-      // Xóa token cũ trước khi đăng nhập
       await clearSharedPreferences();
 
       final response = await _authService.login({
@@ -148,17 +167,16 @@ class AuthProvider with ChangeNotifier {
           throw Exception('Token not found in response');
         }
 
-        // Debug JWT payload
         final payload = _decodeJwtPayload(_token!);
         print('JWT payload: $payload');
+        if (payload?['role'] != 'Admin') {
+          throw Exception('Role not authorized as Admin');
+        }
 
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('jwt_token', _token!);
         print('New token saved: $_token');
 
-        print('Attempting to load profile with token: $_token');
-
-        // Đợi một chút trước khi load profile
         await Future.delayed(const Duration(milliseconds: 100));
 
         try {

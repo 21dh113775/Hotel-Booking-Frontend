@@ -1,11 +1,10 @@
-import 'dart:convert';
-
+// lib/models/register_dto.dart
 class RegisterDto {
   final String fullName;
   final String email;
   final String phoneNumber;
   final String password;
-  final int roleId;
+  final int roleId; // Thêm roleId để gửi vai trò
 
   RegisterDto({
     required this.fullName,
@@ -15,13 +14,11 @@ class RegisterDto {
     required this.roleId,
   });
 
-  Map<String, dynamic> toJson() {
-    return {
-      'fullName': fullName,
-      'email': email,
-      'phoneNumber': phoneNumber,
-      'password': password,
-      'roleId': roleId,
-    };
-  }
+  Map<String, dynamic> toJson() => {
+    'fullName': fullName,
+    'email': email,
+    'phoneNumber': phoneNumber,
+    'password': password,
+    'roleId': roleId,
+  };
 }

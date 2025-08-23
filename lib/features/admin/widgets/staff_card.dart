@@ -3,7 +3,7 @@ import '../../auth/models/user.dart';
 import '../providers/admin_provider.dart';
 import 'package:provider/provider.dart';
 import '../dto/admin_user_update_dto.dart';
-import '../dto/staff_shift_create_dto.dart';
+import '../dto/staff/staff_shift_create_dto.dart';
 
 class StaffCard extends StatelessWidget {
   final User user;

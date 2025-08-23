@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/admin_provider.dart';
 import '../../auth/providers/auth_provider.dart';
-import '../dto/room_create_dto.dart';
-import '../dto/voucher_create_dto.dart';
-import '../dto/staff_shift_create_dto.dart';
+import '../dto/room/room_create_dto.dart';
+import '../dto/voucher/voucher_create_dto.dart';
+import '../dto/staff/staff_shift_create_dto.dart';
 import '../dto/admin_user_update_dto.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
@@ -89,14 +89,14 @@ class AdminDashboardScreen extends StatefulWidget {
 }
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
-  // Hàm chung để fetch dữ liệu ban đầu hoặc refresh
   void _fetchData() {
     final provider = Provider.of<AdminProvider>(context, listen: false);
     provider.fetchUsers();
     provider.fetchRooms();
     provider.fetchVouchers();
-    provider.fetchBookings(); // Bổ sung để xem lịch booking
-    provider.fetchShifts(1); // Giả định staffId 1, có thể thay bằng list
+    provider.fetchBookings();
+    provider.fetchStaffs(); // Đảm bảo fetch danh sách staff
+    // Không cần fetchShifts ở đây, để ShiftManagementScreen xử lý
   }
 
   @override
@@ -182,7 +182,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               crossAxisCount: 2,
                               childAspectRatio: 1.5,
                             ),
-                        itemCount: 5, // Số card
+                        itemCount: 5,
                         itemBuilder: (context, index) {
                           final cards = [
                             {
@@ -243,10 +243,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                     adminProvider,
                                   ),
                               'onDelete':
-                                  () => _showDeleteDialog(
+                                  () => _showDeleteShiftDialog(
                                     context,
                                     adminProvider,
-                                    'shift',
                                   ),
                             },
                             {
@@ -255,7 +254,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               'route': '/admin/booking-management',
                               'onAdd': null,
                               'onDelete': null,
-                            }, // Read-only, không add/delete
+                            },
                           ];
                           return DashboardCard(
                             icon: cards[index]['icon'] as IconData,
@@ -273,7 +272,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  // Dialog thêm user (hoàn thiện với form)
   void _showAddUserDialog(BuildContext context, AdminProvider provider) {
     final _fullNameController = TextEditingController();
     final _emailController = TextEditingController();
@@ -318,6 +316,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ),
               TextButton(
                 onPressed: () {
+                  final dto = AdminUserUpdateDto(
+                    userId: 0,
+                    roleId: _roleId,
+                  ); // Tạm thời, cần API tạo user
                   // Gọi API tạo user nếu backend có endpoint (hiện chưa, có thể thêm sau)
                   Navigator.pop(context);
                 },
@@ -328,11 +330,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  // Dialog thêm shift (hoàn thiện)
   void _showAddShiftDialog(BuildContext context, AdminProvider provider) {
     final _dateController = TextEditingController();
     String _shiftTime = 'Morning';
-    int _staffId = 1;
+    int _staffId = 1; // Mặc định, có thể chọn từ danh sách
 
     showDialog(
       context: context,
@@ -357,6 +358,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   ],
                   onChanged: (value) => setState(() => _shiftTime = value!),
                 ),
+                // Có thể thêm Dropdown cho staffId nếu cần
               ],
             ),
             actions: [
@@ -381,7 +383,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  // Dialog thêm room (hoàn thiện với image picker)
   void _showAddRoomDialog(BuildContext context, AdminProvider provider) {
     final _roomNumberController = TextEditingController();
     final _priceController = TextEditingController();
@@ -446,7 +447,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  // Dialog thêm voucher (hoàn thiện)
   void _showAddVoucherDialog(BuildContext context, AdminProvider provider) {
     final _codeController = TextEditingController();
     final _discountController = TextEditingController();
@@ -499,7 +499,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  // Confirm xóa item (chung cho tất cả)
   void _showDeleteDialog(
     BuildContext context,
     AdminProvider provider,
@@ -528,12 +527,85 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   if (id != null) {
                     if (type == 'user') {
                       // Gọi API xóa user nếu có
-                    } else if (type == 'room')
+                    } else if (type == 'room') {
                       provider.deleteRoom(id);
-                    else if (type == 'voucher')
+                    } else if (type == 'voucher') {
                       provider.deleteVoucher(id);
-                    else if (type == 'shift')
-                      provider.deleteShift(id, 1); // Giả định staffId
+                    } else if (type == 'shift') {
+                      // Giả định xóa shift, cần staffId
+                      showDialog(
+                        context: context,
+                        builder:
+                            (context) => AlertDialog(
+                              title: const Text('Xác nhận xóa ca'),
+                              content: const Text('Nhập Staff ID:'),
+                              actions: [
+                                TextField(
+                                  decoration: const InputDecoration(
+                                    labelText: 'Staff ID',
+                                  ),
+                                  keyboardType: TextInputType.number,
+                                  onChanged: (value) {
+                                    final staffId = int.tryParse(value);
+                                    if (staffId != null) {
+                                      provider.deleteShift(id, staffId);
+                                      Navigator.pop(context);
+                                    }
+                                  },
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: const Text('Hủy'),
+                                ),
+                              ],
+                            ),
+                      );
+                    }
+                  }
+                  Navigator.pop(context);
+                },
+                child: const Text('Xóa'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  void _showDeleteShiftDialog(BuildContext context, AdminProvider provider) {
+    final _idController = TextEditingController();
+    final _staffIdController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Xóa Ca Làm'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: _idController,
+                  decoration: const InputDecoration(labelText: 'ID Ca Làm'),
+                  keyboardType: TextInputType.number,
+                ),
+                TextField(
+                  controller: _staffIdController,
+                  decoration: const InputDecoration(labelText: 'Staff ID'),
+                  keyboardType: TextInputType.number,
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Hủy'),
+              ),
+              TextButton(
+                onPressed: () {
+                  final id = int.tryParse(_idController.text);
+                  final staffId = int.tryParse(_staffIdController.text);
+                  if (id != null && staffId != null) {
+                    provider.deleteShift(id, staffId);
                   }
                   Navigator.pop(context);
                 },

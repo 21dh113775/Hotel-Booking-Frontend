@@ -72,13 +72,13 @@ class _RegisterFormState extends State<RegisterForm>
 
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       try {
-        await authProvider.register({
-          'fullName': _fullNameController.text.trim(),
-          'email': _emailController.text.trim(),
-          'phoneNumber': _phoneNumberController.text.trim(),
-          'password': _passwordController.text,
-          'role': 'Customer', // Default role
-        });
+        await authProvider.register(
+          fullName: _fullNameController.text.trim(),
+          email: _emailController.text.trim(),
+          phoneNumber: _phoneNumberController.text.trim(),
+          password: _passwordController.text,
+          roleId: 1,
+        );
 
         if (mounted) {
           Navigator.pushReplacementNamed(context, '/home');

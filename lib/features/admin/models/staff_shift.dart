@@ -3,12 +3,14 @@ class StaffShift {
   final int staffId;
   final DateTime shiftDate;
   final String shiftTime;
+  final String status;
 
   StaffShift({
     required this.id,
     required this.staffId,
     required this.shiftDate,
     required this.shiftTime,
+    required this.status,
   });
 
   // === GIẢI THÍCH: Factory fromJson để phân tích từ API response ===
@@ -21,6 +23,7 @@ class StaffShift {
         json['shiftDate'] ?? DateTime.now().toIso8601String(),
       ),
       shiftTime: json['shiftTime'] ?? '',
+      status: json['status'] ?? 'Pending',
     );
   }
 }
